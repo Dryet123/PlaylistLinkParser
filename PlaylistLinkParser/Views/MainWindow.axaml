@@ -7,16 +7,48 @@
         x:Class="PlaylistLinkParser.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="PlaylistLinkParser">
+        Title="Tidal Playlist Parser">
 
     <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainViewModel />
+        <vm:MainViewModel/>
     </Design.DataContext>
 
-    <TextBox Text="{Binding Greeting}"
-             HorizontalAlignment="Center"
-             VerticalAlignment="Center" />
+    <Grid RowDefinitions="Auto, Auto, Auto, *">
+        
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="10">
+            <TextBox Text="{Binding Url}" 
+                     Width="450" 
+                     Watermark="https://tidal.com/playlist/..."/>
+            <Button Command="{Binding ParseCommand}" 
+                    Content="Parse Playlist" 
+                    IsEnabled="{Binding !IsLoading}"/>
+        </StackPanel>
 
+        <StackPanel Grid.Row="1" Margin="10, 0, 10, 10" Spacing="5">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="DarkOrange" FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding CurrentPlaylist.Name}" FontWeight="Bold" FontSize="20"/>
+            <TextBlock Text="{Binding CurrentPlaylist.Description}" TextWrapping="Wrap" Foreground="Gray"/>
+        </StackPanel>
+
+        <Grid Grid.Row="2" ColumnDefinitions="2*, 2*, 2*, 1*" Margin="10,0,10,5" Background="#E0E0E0">
+            <TextBlock Grid.Column="0" Text="Song Name" FontWeight="Bold" Margin="5"/>
+            <TextBlock Grid.Column="1" Text="Artist Name" FontWeight="Bold" Margin="5"/>
+            <TextBlock Grid.Column="2" Text="Album Name" FontWeight="Bold" Margin="5"/>
+            <TextBlock Grid.Column="3" Text="Duration" FontWeight="Bold" Margin="5"/>
+        </Grid>
+
+        <ListBox Grid.Row="3" ItemsSource="{Binding Tracks}" Margin="10,0,10,10">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid ColumnDefinitions="2*, 2*, 2*, 1*">
+                        <TextBlock Grid.Column="0" Text="{Binding Title}" TextTrimming="CharacterEllipsis" Margin="5,0,5,0"/>
+                        <TextBlock Grid.Column="1" Text="{Binding Artist}" TextTrimming="CharacterEllipsis" Margin="5,0,5,0"/>
+                        <TextBlock Grid.Column="2" Text="{Binding Album}" TextTrimming="CharacterEllipsis" Margin="5,0,5,0"/>
+                        <TextBlock Grid.Column="3" Text="{Binding Duration}" Margin="5,0,5,0"/>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        
+    </Grid>
 </Window>
