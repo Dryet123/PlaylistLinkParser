@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
 using PlaylistLinkParser.Models;
@@ -17,35 +19,17 @@ public class ParserService
         _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
     }
 
-    public async Task<string> GetHtmlAsync(string url)
-    {
-        try
-        {
-            using var response = await _httpClient.GetAsync(url);
-            response.EnsureSuccessStatusCode();
-            return await response.Content.ReadAsStringAsync();
-        }
-        catch (HttpRequestException ex)
-        {
-            throw new Exception($"Network error: {ex.Message}");
-        }
-        catch (Exception ex)
-        {
-            throw new Exception($"An error occurred: {ex.Message}");
-        }
-    }
-
     public async Task<(PlaylistInfo Playlist, List<TrackInfo> Tracks)> ParsePlaylistAsync(string url)
     {
-        string html = await GetHtmlAsync(url);
-        var doc = new HtmlDocument();
-        doc.LoadHtml(html);
-
         var playlist = new PlaylistInfo();
         var tracks = new List<TrackInfo>();
 
         try
         {
+            string html = await _httpClient.GetStringAsync(url);
+            var doc = new HtmlDocument();
+            doc.LoadHtml(html);
+
             var titleNode = doc.DocumentNode.SelectSingleNode("//meta[@property='og:title']");
             playlist.Name = titleNode?.GetAttributeValue("content", "Unknown") ?? "Unknown";
 
@@ -55,33 +39,61 @@ public class ParserService
             var imageNode = doc.DocumentNode.SelectSingleNode("//meta[@property='og:image']");
             playlist.AvatarUrl = imageNode?.GetAttributeValue("content", string.Empty) ?? string.Empty;
 
-            var trackNodes = doc.DocumentNode.SelectNodes("//div[@role='row']");
+            string playlistId = url.Split(new[] { '?', '/' }, StringSplitOptions.RemoveEmptyEntries).Last();
+            string apiUrl = $"https://tidal.com/v1/playlists/{playlistId}/items?countryCode=US&limit=50";
 
-            if (trackNodes != null)
+            var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
+            request.Headers.Add("x-tidal-token", "txNoH4kkV41MfH25");
+
+            using var response = await _httpClient.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+            
+            string json = await response.Content.ReadAsStringAsync();
+            using var jsonDoc = JsonDocument.Parse(json);
+            
+            if (jsonDoc.RootElement.TryGetProperty("items", out var itemsArray) && itemsArray.ValueKind == JsonValueKind.Array)
             {
-                foreach (var node in trackNodes)
+                foreach (var arrayItem in itemsArray.EnumerateArray())
                 {
-                    var track = new TrackInfo();
-
-                    var titleNodeElement = node.SelectSingleNode(".//div[contains(@class, 'title')]//a");
-                    track.Title = titleNodeElement != null ? HtmlEntity.DeEntitize(titleNodeElement.InnerText).Trim() : "Unknown";
-
-                    var artistNode = node.SelectSingleNode(".//div[contains(@class, 'artist')]//a");
-                    track.Artist = artistNode != null ? HtmlEntity.DeEntitize(artistNode.InnerText).Trim() : "Unknown";
-
-                    var albumNode = node.SelectSingleNode(".//div[contains(@class, 'album')]//a");
-                    track.Album = albumNode != null ? HtmlEntity.DeEntitize(albumNode.InnerText).Trim() : "Unknown";
-
-                    var durationNode = node.SelectSingleNode(".//div[contains(@class, 'duration')]//time") ?? 
-                                       node.SelectSingleNode(".//div[contains(@class, 'duration')]");
-                    track.Duration = durationNode != null ? HtmlEntity.DeEntitize(durationNode.InnerText).Trim() : "0:00";
-
-                    if (track.Title != "Unknown")
+                    if (arrayItem.TryGetProperty("item", out var trackItem))
                     {
-                        tracks.Add(track);
+                        var track = new TrackInfo();
+
+                        if (trackItem.TryGetProperty("title", out var titleProp))
+                        {
+                            track.Title = titleProp.GetString() ?? "Unknown";
+                        }
+
+                        if (trackItem.TryGetProperty("artists", out var artistsArray) && artistsArray.ValueKind == JsonValueKind.Array && artistsArray.GetArrayLength() > 0)
+                        {
+                            if (artistsArray[0].TryGetProperty("name", out var artistNameProp))
+                            {
+                                track.Artist = artistNameProp.GetString() ?? "Unknown";
+                            }
+                        }
+
+                        if (trackItem.TryGetProperty("album", out var albumObj) && albumObj.TryGetProperty("title", out var albumTitleProp))
+                        {
+                            track.Album = albumTitleProp.GetString() ?? "Unknown";
+                        }
+
+                        if (trackItem.TryGetProperty("duration", out var durationProp) && durationProp.TryGetInt32(out var seconds))
+                        {
+                            var timeSpan = TimeSpan.FromSeconds(seconds);
+                            track.Duration = $"{(int)timeSpan.TotalMinutes}:{timeSpan.Seconds:D2}";
+                        }
+
+                        if (!string.IsNullOrEmpty(track.Title) && track.Title != "Unknown")
+                        {
+                            tracks.Add(track);
+                        }
                     }
                 }
             }
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new Exception($"Network error: {ex.Message}");
         }
         catch (Exception ex)
         {
