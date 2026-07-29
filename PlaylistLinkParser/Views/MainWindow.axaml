@@ -24,11 +24,19 @@
                     IsEnabled="{Binding !IsLoading}"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="1" Margin="10, 0, 10, 10" Spacing="5">
-            <TextBlock Text="{Binding StatusMessage}" Foreground="DarkOrange" FontWeight="SemiBold"/>
-            <TextBlock Text="{Binding CurrentPlaylist.Name}" FontWeight="Bold" FontSize="20"/>
-            <TextBlock Text="{Binding CurrentPlaylist.Description}" TextWrapping="Wrap" Foreground="Gray"/>
-        </StackPanel>
+        <Grid Grid.Row="1" ColumnDefinitions="Auto, *" Margin="10, 0, 10, 10">
+            <Image Grid.Column="0" 
+                   Source="{Binding PlaylistImage}" 
+                   Width="100" 
+                   Height="100" 
+                   Margin="0,0,10,0"/>
+            
+            <StackPanel Grid.Column="1" Spacing="5">
+                <TextBlock Text="{Binding StatusMessage}" Foreground="DarkOrange" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding CurrentPlaylist.Name}" FontWeight="Bold" FontSize="20"/>
+                <TextBlock Text="{Binding CurrentPlaylist.Description}" TextWrapping="Wrap" Foreground="Gray"/>
+            </StackPanel>
+        </Grid>
 
         <Grid Grid.Row="2" ColumnDefinitions="2*, 2*, 2*, 1*" Margin="10,0,10,5" Background="#E0E0E0">
             <TextBlock Grid.Column="0" Text="Song Name" FontWeight="Bold" Margin="5"/>

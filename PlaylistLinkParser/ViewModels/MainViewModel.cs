@@ -2,42 +2,50 @@ using System;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using ReactiveUI;
+using Avalonia.Media.Imaging;
+using CommunityToolkit.Mvvm.Input;
 using PlaylistLinkParser.Models;
 using PlaylistLinkParser.Services;
 
 namespace PlaylistLinkParser.ViewModels;
 
-public class MainViewModel : ReactiveObject
+public class MainViewModel : ViewModelBase
 {
     private readonly ParserService _parserService;
     private string _url = string.Empty;
     private PlaylistInfo _currentPlaylist = new();
     private bool _isLoading;
     private string _statusMessage = string.Empty;
+    private Bitmap? _playlistImage;
 
     public string Url
     {
         get => _url;
-        set => this.RaiseAndSetIfChanged(ref _url, value);
+        set => SetProperty(ref _url, value);
     }
 
     public PlaylistInfo CurrentPlaylist
     {
         get => _currentPlaylist;
-        set => this.RaiseAndSetIfChanged(ref _currentPlaylist, value);
+        set => SetProperty(ref _currentPlaylist, value);
     }
 
     public bool IsLoading
     {
         get => _isLoading;
-        set => this.RaiseAndSetIfChanged(ref _isLoading, value);
+        set => SetProperty(ref _isLoading, value);
     }
 
     public string StatusMessage
     {
         get => _statusMessage;
-        set => this.RaiseAndSetIfChanged(ref _statusMessage, value);
+        set => SetProperty(ref _statusMessage, value);
+    }
+
+    public Bitmap? PlaylistImage
+    {
+        get => _playlistImage;
+        set => SetProperty(ref _playlistImage, value);
     }
 
     public ObservableCollection<TrackInfo> Tracks { get; } = new();
@@ -47,7 +55,7 @@ public class MainViewModel : ReactiveObject
     public MainViewModel()
     {
         _parserService = new ParserService();
-        ParseCommand = ReactiveCommand.CreateFromTask(ParsePlaylistAsync);
+        ParseCommand = new AsyncRelayCommand(ParsePlaylistAsync);
     }
 
     private async Task ParsePlaylistAsync()
@@ -64,10 +72,17 @@ public class MainViewModel : ReactiveObject
             StatusMessage = "Loading playlist data...";
 
             Tracks.Clear();
+            PlaylistImage = null;
 
             var (playlist, tracks) = await _parserService.ParsePlaylistAsync(Url);
 
             CurrentPlaylist = playlist;
+            
+            if (!string.IsNullOrEmpty(playlist.AvatarUrl))
+            {
+                PlaylistImage = await ImageHelper.LoadFromWebAsync(playlist.AvatarUrl);
+            }
+
             foreach (var track in tracks)
             {
                 Tracks.Add(track);
