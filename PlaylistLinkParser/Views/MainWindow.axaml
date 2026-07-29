@@ -34,11 +34,11 @@
             <StackPanel Grid.Column="1" Spacing="5">
                 <TextBlock Text="{Binding StatusMessage}" Foreground="DarkOrange" FontWeight="SemiBold"/>
                 <TextBlock Text="{Binding CurrentPlaylist.Name}" FontWeight="Bold" FontSize="20"/>
-                <TextBlock Text="{Binding CurrentPlaylist.Description}" TextWrapping="Wrap" Foreground="Gray"/>
+                <TextBlock Text="{Binding CurrentPlaylist.Description}" TextWrapping="Wrap" Opacity="0.7"/>
             </StackPanel>
         </Grid>
 
-        <Grid Grid.Row="2" ColumnDefinitions="2*, 2*, 2*, 1*" Margin="10,0,10,5" Background="#E0E0E0">
+        <Grid Grid.Row="2" ColumnDefinitions="2*, 2*, 2*, 1*" Margin="10,0,10,5">
             <TextBlock Grid.Column="0" Text="Song Name" FontWeight="Bold" Margin="5"/>
             <TextBlock Grid.Column="1" Text="Artist Name" FontWeight="Bold" Margin="5"/>
             <TextBlock Grid.Column="2" Text="Album Name" FontWeight="Bold" Margin="5"/>
