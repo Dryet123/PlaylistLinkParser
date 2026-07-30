@@ -11,9 +11,9 @@ namespace PlaylistLinkParser.Services;
 
 public class ParserService
 {
-    private readonly HttpClient _httpClient;
+    private static readonly HttpClient _httpClient;
 
-    public ParserService()
+    static ParserService()
     {
         _httpClient = new HttpClient();
         _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
@@ -40,54 +40,77 @@ public class ParserService
             playlist.AvatarUrl = imageNode?.GetAttributeValue("content", string.Empty) ?? string.Empty;
 
             string playlistId = url.Split(new[] { '?', '/' }, StringSplitOptions.RemoveEmptyEntries).Last();
-            string apiUrl = $"https://tidal.com/v1/playlists/{playlistId}/items?countryCode=US&limit=50";
-
-            var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
-            request.Headers.Add("x-tidal-token", "txNoH4kkV41MfH25");
-
-            using var response = await _httpClient.SendAsync(request);
-            response.EnsureSuccessStatusCode();
             
-            string json = await response.Content.ReadAsStringAsync();
-            using var jsonDoc = JsonDocument.Parse(json);
-            
-            if (jsonDoc.RootElement.TryGetProperty("items", out var itemsArray) && itemsArray.ValueKind == JsonValueKind.Array)
+            int offset = 0;
+            int limit = 50;
+            bool hasMoreTracks = true;
+
+            while (hasMoreTracks)
             {
-                foreach (var arrayItem in itemsArray.EnumerateArray())
+                string apiUrl = $"https://tidal.com/v1/playlists/{playlistId}/items?countryCode=US&limit={limit}&offset={offset}";
+
+                var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
+                request.Headers.Add("x-tidal-token", "txNoH4kkV41MfH25");
+
+                using var response = await _httpClient.SendAsync(request);
+                response.EnsureSuccessStatusCode();
+                
+                string json = await response.Content.ReadAsStringAsync();
+                using var jsonDoc = JsonDocument.Parse(json);
+                
+                if (jsonDoc.RootElement.TryGetProperty("items", out var itemsArray) && itemsArray.ValueKind == JsonValueKind.Array)
                 {
-                    if (arrayItem.TryGetProperty("item", out var trackItem))
+                    int currentBatchCount = itemsArray.GetArrayLength();
+
+                    foreach (var arrayItem in itemsArray.EnumerateArray())
                     {
-                        var track = new TrackInfo();
-
-                        if (trackItem.TryGetProperty("title", out var titleProp))
+                        if (arrayItem.TryGetProperty("item", out var trackItem))
                         {
-                            track.Title = titleProp.GetString() ?? "Unknown";
-                        }
+                            var track = new TrackInfo();
 
-                        if (trackItem.TryGetProperty("artists", out var artistsArray) && artistsArray.ValueKind == JsonValueKind.Array && artistsArray.GetArrayLength() > 0)
-                        {
-                            if (artistsArray[0].TryGetProperty("name", out var artistNameProp))
+                            if (trackItem.TryGetProperty("title", out var titleProp))
                             {
-                                track.Artist = artistNameProp.GetString() ?? "Unknown";
+                                track.Title = titleProp.GetString() ?? "Unknown";
+                            }
+
+                            if (trackItem.TryGetProperty("artists", out var artistsArray) && artistsArray.ValueKind == JsonValueKind.Array && artistsArray.GetArrayLength() > 0)
+                            {
+                                if (artistsArray[0].TryGetProperty("name", out var artistNameProp))
+                                {
+                                    track.Artist = artistNameProp.GetString() ?? "Unknown";
+                                }
+                            }
+
+                            if (trackItem.TryGetProperty("album", out var albumObj) && albumObj.TryGetProperty("title", out var albumTitleProp))
+                            {
+                                track.Album = albumTitleProp.GetString() ?? "Unknown";
+                            }
+
+                            if (trackItem.TryGetProperty("duration", out var durationProp) && durationProp.TryGetInt32(out var seconds))
+                            {
+                                var timeSpan = TimeSpan.FromSeconds(seconds);
+                                track.Duration = $"{(int)timeSpan.TotalMinutes}:{timeSpan.Seconds:D2}";
+                            }
+
+                            if (!string.IsNullOrEmpty(track.Title) && track.Title != "Unknown")
+                            {
+                                tracks.Add(track);
                             }
                         }
-
-                        if (trackItem.TryGetProperty("album", out var albumObj) && albumObj.TryGetProperty("title", out var albumTitleProp))
-                        {
-                            track.Album = albumTitleProp.GetString() ?? "Unknown";
-                        }
-
-                        if (trackItem.TryGetProperty("duration", out var durationProp) && durationProp.TryGetInt32(out var seconds))
-                        {
-                            var timeSpan = TimeSpan.FromSeconds(seconds);
-                            track.Duration = $"{(int)timeSpan.TotalMinutes}:{timeSpan.Seconds:D2}";
-                        }
-
-                        if (!string.IsNullOrEmpty(track.Title) && track.Title != "Unknown")
-                        {
-                            tracks.Add(track);
-                        }
                     }
+
+                    if (currentBatchCount < limit)
+                    {
+                        hasMoreTracks = false;
+                    }
+                    else
+                    {
+                        offset += limit;
+                    }
+                }
+                else
+                {
+                    hasMoreTracks = false;
                 }
             }
         }
