@@ -9,7 +9,7 @@ using PlaylistLinkParser.Models;
 
 namespace PlaylistLinkParser.Services;
 
-public class ParserService
+public class ParserService : IParserService
 {
     private static readonly HttpClient _httpClient;
 

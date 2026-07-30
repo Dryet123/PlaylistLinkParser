@@ -11,7 +11,7 @@ namespace PlaylistLinkParser.ViewModels;
 
 public class MainViewModel : ViewModelBase
 {
-    private readonly ParserService _parserService;
+    private readonly IParserService? _parserService;
     private string _url = string.Empty;
     private PlaylistInfo _currentPlaylist = new();
     private bool _isLoading;
@@ -54,13 +54,17 @@ public class MainViewModel : ViewModelBase
 
     public MainViewModel()
     {
-        _parserService = new ParserService();
+    }
+
+    public MainViewModel(IParserService parserService)
+    {
+        _parserService = parserService;
         ParseCommand = new AsyncRelayCommand(ParsePlaylistAsync);
     }
 
     private async Task ParsePlaylistAsync()
     {
-        if (string.IsNullOrWhiteSpace(Url))
+        if (_parserService == null || string.IsNullOrWhiteSpace(Url))
         {
             StatusMessage = "Please enter a valid URL.";
             return;
